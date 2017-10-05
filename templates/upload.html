@@ -33,9 +33,8 @@
     <h3>Upload a color photo file.</h3>
     <div>
       <form id="upload" method=post action={{ url_for('post') }} enctype="multipart/form-data">
-        {{ render_field(photo_form.input_photo) }}
-        <p><input type="text" name="url"/></p>
-        <p><input type="button" onclick="WaitDisplay();" value="Upload"></p>
+        <p>Paste URL: <input type="text" name="url" width="200px" placeholder="Santa URL"/></p>
+        <p><input type="button" onclick="WaitDisplay();" value="Find Santa"></p>
       </form>
     </div>
 

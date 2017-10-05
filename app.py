@@ -19,6 +19,7 @@
 import base64
 from io import BytesIO
 import sys
+import os
 import tempfile
 
 MODEL_BASE = '/opt/models/research'
@@ -41,7 +42,14 @@ from utils import label_map_util
 from werkzeug.datastructures import CombinedMultiDict
 from wtforms import Form
 from wtforms import ValidationError
+import urllib.request
 
+THRESHOLD = float(os.environ.get('THRESHOLD', '0.9'))
+PORT = int(os.environ.get('PORT', '5000'))
+DEBUG = os.environ.get('DEBUG', False)
+NUM_CLASSES = int(os.environ.get('NUM_CLASSES', 1))
+if DEBUG != False:
+  DEBUG = True
 
 app = Flask(__name__)
 
@@ -85,7 +93,7 @@ class ObjectDetector(object):
 
     label_map = label_map_util.load_labelmap(PATH_TO_LABELS)
     categories = label_map_util.convert_label_map_to_categories(
-        label_map, max_num_classes=90, use_display_name=True)
+        label_map, max_num_classes=NUM_CLASSES, use_display_name=True)
     self.category_index = label_map_util.create_category_index(categories)
 
   def _build_graph(self):
@@ -176,12 +184,12 @@ def detect_objects(image_path):
   image.thumbnail((480, 480), Image.ANTIALIAS)
 
   new_images = {}
-  print(num_detections[0])
+  print(num_detections)
   print(scores)
   print(classes)
-  #for (i,y), value in np.ndenumerate(num_detections):
+
   for i in range(int(num_detections[0])):
-    if scores[0][i] < 0.9: continue
+    if scores[0][i] <= THRESHOLD: continue
     cls = classes[0][i]
     if cls not in new_images.keys():
       new_images[cls] = image.copy()
@@ -207,18 +215,28 @@ def upload():
 @app.route('/post', methods=['GET', 'POST'])
 def post():
   form = PhotoForm(CombinedMultiDict((request.files, request.form)))
-  if request.form['url']:
-      print('the url', request.form['url'])
+  url = request.form['url']
+  if url != None:
+      print('the url', url)
 
-  if request.method == 'POST' and form.validate():
-    with tempfile.NamedTemporaryFile() as temp:
-      form.input_photo.data.save(temp)
-      temp.flush()
-      result = detect_objects(temp.name)
+  if request.method == 'POST' and (form.validate() or url != None):
+    
+    try:
+      if url != None:
+        file_name = '/tmp/' + url.split('/')[-1]
+        urllib.request.urlretrieve(url, file_name)
+        result = detect_objects(file_name)
+      else:
+        with tempfile.NamedTemporaryFile() as temp:
+          form.input_photo.data.save(temp)
+          temp.flush()
+          result = detect_objects(temp.name)
 
-    photo_form = PhotoForm(request.form)
-    return render_template('upload.html',
-                           photo_form=photo_form, result=result)
+      photo_form = PhotoForm(request.form)
+      return render_template('upload.html',
+                            photo_form=photo_form, result=result)
+    except:
+      return redirect(url_for('upload'))
   else:
     return redirect(url_for('upload'))
 
@@ -227,4 +245,4 @@ client = ObjectDetector()
 
 
 if __name__ == '__main__':
-  app.run(host='0.0.0.0', port=80, debug=True)
+  app.run(host='0.0.0.0', port=PORT, debug=DEBUG)
