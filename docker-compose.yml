@@ -9,6 +9,7 @@ services:
       THRESHOLD: 0.6
       DEBUG: "True"
       NUM_CLASSES: 1
+      PYTHONUNBUFFERED: 1
     volumes:
        - ./frozen_inference_graph.pb:/opt/graph_def/frozen_inference_graph.pb
        - ./santa_label_map.pbtext:/opt/configs/data/santa_label_map.pbtext

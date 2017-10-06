@@ -21,6 +21,7 @@ from io import BytesIO
 import sys
 import os
 import tempfile
+import time
 
 MODEL_BASE = '/opt/models/research'
 sys.path.append(MODEL_BASE)
@@ -37,6 +38,7 @@ from flask_wtf.file import FileField
 import numpy as np
 from PIL import Image
 from PIL import ImageDraw
+from PIL import ImageFont
 import tensorflow as tf
 from utils import label_map_util
 from werkzeug.datastructures import CombinedMultiDict
@@ -48,16 +50,29 @@ THRESHOLD = float(os.environ.get('THRESHOLD', '0.9'))
 PORT = int(os.environ.get('PORT', '5000'))
 DEBUG = os.environ.get('DEBUG', False)
 NUM_CLASSES = int(os.environ.get('NUM_CLASSES', 1))
+ImageFont.load_default()
 if DEBUG != False:
   DEBUG = True
 
 app = Flask(__name__)
 
+def timing(f):
+    def wrap(*args):
+        t = time.process_time()
+        ret = f(*args)
+        elapsed_time = time.process_time() - t
+        print('++++++++++++++++++++ TIMING ++++++++++++++++++++++++++++++++++++')
+        print('')
+        print('%s function took %s s' % (f.__name__, ((elapsed_time))))
+        print('')
+        print('++++++++++++++++++++ TIMING ++++++++++++++++++++++++++++++++++++')
+        return ret
+    return wrap
 
-@app.before_request
-#@requires_auth
-def before_request():
-  pass
+# @app.before_request
+# #@requires_auth
+# def before_request():
+#   pass
 
 
 PATH_TO_CKPT = '/opt/graph_def/frozen_inference_graph.pb'
@@ -68,7 +83,7 @@ content_types = {'jpg': 'image/jpeg',
                  'png': 'image/png'}
 extensions = sorted(content_types.keys())
 
-print(PATH_TO_LABELS)
+@timing
 def is_image():
   def _is_image(form, field):
     if not field.data:
@@ -86,7 +101,8 @@ class PhotoForm(Form):
 
 
 class ObjectDetector(object):
-
+  
+  @timing
   def __init__(self):
     self.detection_graph = self._build_graph()
     self.sess = tf.Session(graph=self.detection_graph)
@@ -95,7 +111,8 @@ class ObjectDetector(object):
     categories = label_map_util.convert_label_map_to_categories(
         label_map, max_num_classes=NUM_CLASSES, use_display_name=True)
     self.category_index = label_map_util.create_category_index(categories)
-
+  
+  @timing
   def _build_graph(self):
     detection_graph = tf.Graph()
     with detection_graph.as_default():
@@ -106,34 +123,14 @@ class ObjectDetector(object):
         tf.import_graph_def(od_graph_def, name='')
 
     return detection_graph
-
+  
+  @timing
   def _load_image_into_numpy_array(self, image):
     (im_width, im_height) = image.size
     return np.array(image.getdata()).reshape(
         (im_height, im_width, 3)).astype(np.uint8)
   
-  def custom_detect(self, image):
-    # Definite input and output Tensors for detection_graph
-    image_tensor = self.detection_graph.get_tensor_by_name('image_tensor:0')
-    # Each box represents a part of the image where a particular object was detected.
-    detection_boxes = self.detection_graph.get_tensor_by_name('detection_boxes:0')
-    # Each score represent how level of confidence for each of the objects.
-    # Score is shown on the result image, together with the class label.
-    detection_scores = self.detection_graph.get_tensor_by_name('detection_scores:0')
-    detection_classes = self.detection_graph.get_tensor_by_name('detection_classes:0')
-    num_detections = self.detection_graph.get_tensor_by_name('num_detections:0')
-    # the array based representation of the image will be used later in order to prepare the
-    # result image with boxes and labels on it.
-    image_np = self._load_image_into_numpy_array(image)
-    # Expand dimensions since the model expects images to have shape: [1, None, None, 3]
-    image_np_expanded = np.expand_dims(image_np, axis=0)
-    # Actual detection.
-    (boxes, scores, classes, num) = self.sess.run(
-        [detection_boxes, detection_scores, detection_classes, num_detections],
-        feed_dict={image_tensor: image_np_expanded})
-
-    return boxes, scores, classes.astype(int), num
-
+  @timing
   def detect(self, image):
     image_np = self._load_image_into_numpy_array(image)
     image_np_expanded = np.expand_dims(image_np, axis=0)
@@ -154,8 +151,8 @@ class ObjectDetector(object):
 
     return boxes, scores, classes.astype(int), num_detections
 
-
-def draw_bounding_box_on_image(image, box, color='red', thickness=4):
+@timing
+def draw_bounding_box_on_image(image, box, object_class, color='red', thickness=4):
   draw = ImageDraw.Draw(image)
   im_width, im_height = image.size
   ymin, xmin, ymax, xmax = box
@@ -163,8 +160,11 @@ def draw_bounding_box_on_image(image, box, color='red', thickness=4):
                                 ymin * im_height, ymax * im_height)
   draw.line([(left, top), (left, bottom), (right, bottom),
              (right, top), (left, top)], width=thickness, fill=color)
+  draw.text((left, top), object_class, width=thickness, fill='black')
+             
+  return (left, right, top, bottom)
 
-
+@timing
 def encode_image(image):
   image_buffer = BytesIO()
   image.save(image_buffer, format='PNG')
@@ -175,36 +175,35 @@ def encode_image(image):
   imgstr = imgstr + image_base64_str.decode('utf-8')
   return imgstr
 
-
-def detect_objects(image_path):
-  #image = Image.open(image_path).convert('RGB')
+@timing
+def detect_objects(image_path, url):
+  image = Image.open(image_path).convert('RGB')
   #boxes, scores, classes, num_detections = client.detect(image)
-  image = Image.open(image_path)
-  boxes, scores, classes, num_detections  = client.custom_detect(image)
-  image.thumbnail((480, 480), Image.ANTIALIAS)
-
-  new_images = {}
-  print(num_detections)
-  print(scores)
-  print(classes)
-
-  for i in range(int(num_detections[0])):
-    if scores[0][i] <= THRESHOLD: continue
-    cls = classes[0][i]
-    if cls not in new_images.keys():
-      new_images[cls] = image.copy()
-    draw_bounding_box_on_image(new_images[cls], boxes[0][i],
-                               thickness=int(scores[0][i]*10)-4)
+  # image = Image.open(image_path)
+  boxes, scores, classes, num_detections  = client.detect(image)
+  image.thumbnail((1080, 1080), Image.ANTIALIAS)
 
   result = {}
-  result['original'] = encode_image(image.copy())
+  result['image'] = image.copy()
+  result['object_classes'] = []
 
-  for cls, new_image in new_images.items():
-    category = client.category_index[cls]['name']
-    result[category] = encode_image(new_image)
-
+  for i in range(int(num_detections)):
+    if scores[i] <= THRESHOLD: continue
+    object_class_name = client.category_index[classes[i]]['name']
+    print('Found Class: %s in URL: %s with Score: %s' % (object_class_name, url, scores[i]))
+    object_class = {}
+    object_class['name'] = object_class_name
+    result['object_classes'].append(object_class)
+    object_class['boxes'] = draw_bounding_box_on_image(result['image'], boxes[i], object_class_name)
+  
+  result['image'] = encode_image(result['image'])
   return result
 
+@timing
+def get_image(url):
+  file_name = '/tmp/' + url.split('/')[-1].split('?')[0]
+  urllib.request.urlretrieve(url, file_name)
+  return file_name
 
 @app.route('/')
 def upload():
@@ -216,27 +215,17 @@ def upload():
 def post():
   form = PhotoForm(CombinedMultiDict((request.files, request.form)))
   url = request.form['url']
-  if url != None:
-      print('the url', url)
 
   if request.method == 'POST' and (form.validate() or url != None):
     
-    try:
-      if url != None:
-        file_name = '/tmp/' + url.split('/')[-1]
-        urllib.request.urlretrieve(url, file_name)
-        result = detect_objects(file_name)
-      else:
-        with tempfile.NamedTemporaryFile() as temp:
-          form.input_photo.data.save(temp)
-          temp.flush()
-          result = detect_objects(temp.name)
-
-      photo_form = PhotoForm(request.form)
-      return render_template('upload.html',
-                            photo_form=photo_form, result=result)
-    except:
-      return redirect(url_for('upload'))
+    #try:
+    file_name = get_image(url)
+    result = detect_objects(file_name, url)
+    photo_form = PhotoForm(request.form)
+    return render_template('upload.html',
+                          photo_form=photo_form, result=result)
+    # except:
+    #   return redirect(url_for('upload'))
   else:
     return redirect(url_for('upload'))
 

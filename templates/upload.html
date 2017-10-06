@@ -6,12 +6,17 @@
     <link rel='shortcut icon' href='favicon.ico'/>
 
     <script language="javascript" type="text/javascript">
-      function ChangePhoto(name, img) {
-        img = typeof img !== 'undefined' ? img : "{{ result['original'] }}";
-        target = document.getElementById("label");
-        target.innerHTML = name;
-        target = document.getElementById("photo");
-        target.src = img;
+
+      function DrawLabels(name, box) {
+          // setTimeout(function() {
+          //   var photo = document.getElementById("photo");
+          //   var childElement = document.createElement('div');
+          //   childElement.innerHTML = '<p>' + name + '</p>';
+          //   childElement.style.position = "absolute";
+          //   childElement.style.left =  box[0] + "px";
+          //   childElement.style.top =  box[3] + "px";
+          //   photo.appendChild(childElement);
+          // }, 1000)
       }
 
       function WaitDisplay() {
@@ -22,6 +27,12 @@
         setTimeout(function() {
           document.getElementById("upload").submit();}, 100);
         }
+
+        // {% for item in result['object_classes'] %}
+        //     var boxes = {{item['boxes']| tojson}};
+        //     var object_class = {{item['name'] | tojson}};
+        //     DrawLabels(object_class, boxes)
+        // {% endfor %}
     </script>
 
   </head>
@@ -33,7 +44,7 @@
     <h3>Upload a color photo file.</h3>
     <div>
       <form id="upload" method=post action={{ url_for('post') }} enctype="multipart/form-data">
-        <p>Paste URL: <input type="text" name="url" width="200px" placeholder="Santa URL"/></p>
+        <p>Paste URL: <input type="text" name="url" value="https://www.colourbox.com/preview/2695886-happy-santa-claus-with-sack-of-gifts.jpg" width="200px" placeholder="Santa URL"/></p>
         <p><input type="button" onclick="WaitDisplay();" value="Find Santa"></p>
       </form>
     </div>
@@ -42,19 +53,9 @@
 
     <div id="result">
       {% if result|length > 0 %}
-        <div id="label">original</div>
-        <div><img id="photo" src="{{ result['original'] }}" align="left" hspace="10" vspace="10"></div>
-        <p>
-          <a href="javascript:void(0);" onclick="ChangePhoto('original');">original</a>
-          </br>
-          {% for name, img in result.items() %}
-            {% if name != 'original' %}
-              <a href="javascript:void(0);"
-                 onclick="ChangePhoto('{{ name }}', '{{ result[ name ] }}');">{{ name }}</a>
-              </br>
-            {% endif %}
-          {% endfor %}
-        </p>
+        <div id="photo">
+          <img src="{{ result['image'] }}" align="left" hspace="10" vspace="10">
+        </div>
       {% endif %}
     </div>
     <div id="loading" style="display:none">
