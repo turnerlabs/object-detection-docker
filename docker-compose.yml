@@ -1,7 +1,7 @@
 version: "2"
 services:
   object_detection:
-    image: turnerlabs/object-detection-docker
+    image: turnerlabs/object-detection-docker:0.2.0
     ports:
     - 80:5000
     environment:
