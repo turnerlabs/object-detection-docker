@@ -34,6 +34,7 @@ from flask import redirect
 from flask import render_template
 from flask import request
 from flask import url_for
+from flask import jsonify
 from flask_wtf.file import FileField
 import numpy as np
 from PIL import Image
@@ -69,10 +70,44 @@ def timing(f):
         return ret
     return wrap
 
-# @app.before_request
-# #@requires_auth
-# def before_request():
-#   pass
+@app.before_request
+def option_autoreply():
+    """ Always reply 200 on OPTIONS request """
+
+    if request.method == 'OPTIONS':
+        resp = app.make_default_options_response()
+
+        headers = None
+        if 'ACCESS_CONTROL_REQUEST_HEADERS' in request.headers:
+            headers = request.headers['ACCESS_CONTROL_REQUEST_HEADERS']
+
+        h = resp.headers
+
+        # Allow the origin which made the XHR
+        h['Access-Control-Allow-Origin'] = request.headers['Origin']
+        # Allow the actual method
+        h['Access-Control-Allow-Methods'] = request.headers['Access-Control-Request-Method']
+        # Allow for 10 seconds
+        h['Access-Control-Max-Age'] = "10"
+
+        # We also keep current headers
+        if headers is not None:
+            h['Access-Control-Allow-Headers'] = headers
+
+        return resp
+
+@app.after_request
+def set_allow_origin(resp):
+    """ Set origin for GET, POST, PUT, DELETE requests """
+
+    h = resp.headers
+
+    # Allow crossdomain for other HTTP Verbs
+    if request.method != 'OPTIONS' and 'Origin' in request.headers:
+        h['Access-Control-Allow-Origin'] = request.headers['Origin']
+
+
+    return resp
 
 
 PATH_TO_CKPT = '/opt/graph_def/frozen_inference_graph.pb'
@@ -211,23 +246,28 @@ def upload():
   return render_template('upload.html', photo_form=photo_form, result={})
 
 
-@app.route('/post', methods=['GET', 'POST'])
+@app.route('/detect', methods=['POST'])
 def post():
-  form = PhotoForm(CombinedMultiDict((request.files, request.form)))
-  url = request.form['url']
-
-  if request.method == 'POST' and (form.validate() or url != None):
-    
+  # form = PhotoForm(CombinedMultiDict((request.files, request.form)))
+  if request.headers['Content-Type'] == 'application/json':
+    url = request.json['url']
+      
     #try:
+    print(url)
     file_name = get_image(url)
     result = detect_objects(file_name, url)
-    photo_form = PhotoForm(request.form)
-    return render_template('upload.html',
-                          photo_form=photo_form, result=result)
-    # except:
-    #   return redirect(url_for('upload'))
-  else:
-    return redirect(url_for('upload'))
+    # photo_form = PhotoForm(request.form)
+    print(result)
+    return jsonify(result)
+  
+  errorJSON = {}
+  errorJSON['code'] = 403
+  errorJSON['message'] = "must send Content-Type: application/json"
+  return jsonify(errorJSON)
+  # except:
+  #   return redirect(url_for('upload'))
+  # else:
+  #   return redirect(url_for('upload'))
 
 
 client = ObjectDetector()
