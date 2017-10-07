@@ -31,7 +31,6 @@ sys.path.append(MODEL_BASE + '/slim')
 #from decorator import requires_auth
 from flask import Flask
 from flask import redirect
-from flask import render_template
 from flask import request
 from flask import url_for
 from flask import jsonify
@@ -274,10 +273,11 @@ def get_image(url):
   return file_name
 
 @app.route('/')
-def upload():
-  photo_form = PhotoForm(request.form)
-  return render_template('upload.html', photo_form=photo_form, result={})
-
+def healthcheck():
+  JSON = {}
+  JSON['code'] = 200
+  JSON['message'] = "ready to serve. POST to /detect with url in body for data..."
+  return jsonify(JSON)
 
 @app.route('/detect', methods=['POST'])
 def post():

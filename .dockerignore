@@ -1,3 +1,4 @@
 *.pb
 *.pbtext
 *.env
+harbor-compose.yml

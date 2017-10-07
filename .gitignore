@@ -2,3 +2,4 @@
 *.pbtext
 *.pyc
 *.env
+harbor-compose.yml
