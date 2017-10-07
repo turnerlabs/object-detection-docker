@@ -46,14 +46,56 @@ from werkzeug.datastructures import CombinedMultiDict
 from wtforms import Form
 from wtforms import ValidationError
 import urllib.request
+import boto
+import boto.s3.connection
 
 THRESHOLD = float(os.environ.get('THRESHOLD', '0.9'))
 PORT = int(os.environ.get('PORT', '5000'))
 DEBUG = os.environ.get('DEBUG', False)
 NUM_CLASSES = int(os.environ.get('NUM_CLASSES', 1))
+ACCESS_KEY = os.environ.get('ACCESS_KEY', False)
+SECRET_KEY = os.environ.get('SECRET_KEY', False)
+BUCKET = os.environ.get('BUCKET', False)
+CKPT_S3_FILE = os.environ.get('CKPT_S3_FILE', False)
+LABEL_S3_FILE = os.environ.get('LABEL_S3_FILE', False)
+content_types = {'jpg': 'image/jpeg',
+                 'jpeg': 'image/jpeg',
+                 'png': 'image/png'}
+extensions = sorted(content_types.keys())
 ImageFont.load_default()
+PATH_TO_CKPT = '/opt/graph_def/frozen_inference_graph.pb'
+PATH_TO_LABELS = '/opt/configs/label_map.pbtext'
+
 if DEBUG != False:
   DEBUG = True
+
+if ACCESS_KEY != False and \
+    SECRET_KEY != False and \
+    BUCKET != False and \
+    CKPT_S3_FILE != False and \
+    LABEL_S3_FILE != False:
+    conn = boto.connect_s3(
+        aws_access_key_id = ACCESS_KEY,
+        aws_secret_access_key = SECRET_KEY,
+    )
+    bucket = conn.get_bucket(BUCKET)
+    ckpt = bucket.get_key(CKPT_S3_FILE)
+    labels = bucket.get_key(LABEL_S3_FILE)
+    ckpt.get_contents_to_filename(PATH_TO_CKPT)
+    labels.get_contents_to_filename(PATH_TO_LABELS)
+
+elif ACCESS_KEY != False or \
+    SECRET_KEY != False or \
+    BUCKET != False or \
+    CKPT_S3_FILE != False or \
+    LABEL_S3_FILE != False:
+    print("Must pass in every S3 value needed...")
+    print("ACCESS_KEY: the access key")
+    print("SECRET_KEY: the secret key")
+    print("BUCKET: the bucket name")
+    print("CKPT_S3_FILE: the path the .pb model file in s3")
+    print("LABEL_S3_FILE: the path to the label file in s3")
+    sys.exit(1)
 
 app = Flask(__name__)
 
@@ -108,15 +150,6 @@ def set_allow_origin(resp):
 
 
     return resp
-
-
-PATH_TO_CKPT = '/opt/graph_def/frozen_inference_graph.pb'
-PATH_TO_LABELS = '/opt/configs/data/santa_label_map.pbtext'
-
-content_types = {'jpg': 'image/jpeg',
-                 'jpeg': 'image/jpeg',
-                 'png': 'image/png'}
-extensions = sorted(content_types.keys())
 
 @timing
 def is_image():

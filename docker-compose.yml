@@ -1,7 +1,7 @@
 version: "2"
 services:
   object_detection:
-    image: turnerlabs/object-detection-docker:0.3.0
+    image: object-detection-docker
     ports:
     - 5000:5000
     environment:
@@ -10,6 +10,8 @@ services:
       DEBUG: "True"
       NUM_CLASSES: 1
       PYTHONUNBUFFERED: 1
-    volumes:
-       - ./frozen_inference_graph.pb:/opt/graph_def/frozen_inference_graph.pb
-       - ./santa_label_map.pbtext:/opt/configs/data/santa_label_map.pbtext
+      SECRET_KEY: "${SECRET_KEY}"
+      ACCESS_KEY: "${ACCESS_KEY}"
+      BUCKET: "${BUCKET}"
+      CKPT_S3_FILE: "${CKPT_S3_FILE}"
+      LABEL_S3_FILE: "${LABEL_S3_FILE}"

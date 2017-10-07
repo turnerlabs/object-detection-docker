@@ -1,3 +1,4 @@
 *.pb
 *.pbtext
 *.pyc
+*.env

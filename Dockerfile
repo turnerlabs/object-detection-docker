@@ -7,6 +7,7 @@ ADD . /opt/object_detection/
 # # expose ports
 # EXPOSE 5000
 
-# CMD uwsgi --ini /var/app/uwsgi_config.ini
+RUN mkdir /opt/graph_def && \
+    mkdir /opt/configs
 
 CMD ["/usr/bin/python3", "/opt/object_detection/app.py"]
