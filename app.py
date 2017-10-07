@@ -248,26 +248,29 @@ def upload():
 
 @app.route('/detect', methods=['POST'])
 def post():
-  # form = PhotoForm(CombinedMultiDict((request.files, request.form)))
+  errorJSON = {}
   if request.headers['Content-Type'] == 'application/json':
     url = request.json['url']
       
-    #try:
-    print(url)
-    file_name = get_image(url)
-    result = detect_objects(file_name, url)
-    # photo_form = PhotoForm(request.form)
-    print(result)
-    return jsonify(result)
+    try:
+      print(url)
+      file_name = get_image(url)
+      result = detect_objects(file_name, url)
+      return jsonify(result)
+    except Exception as e:
+        errorJSON = {}
+        errorJSON['code'] = 500
+        if hasattr(e, 'message'):
+            print(e.message)
+            errorJSON['message'] = e.message
+        else:
+            print(e)
+            errorJSON['message'] = "ERROR => " + str(e)
+            return jsonify(errorJSON)
   
-  errorJSON = {}
   errorJSON['code'] = 403
   errorJSON['message'] = "must send Content-Type: application/json"
   return jsonify(errorJSON)
-  # except:
-  #   return redirect(url_for('upload'))
-  # else:
-  #   return redirect(url_for('upload'))
 
 
 client = ObjectDetector()
