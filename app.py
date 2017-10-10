@@ -57,6 +57,7 @@ SECRET_KEY = os.environ.get('SECRET_KEY', False)
 BUCKET = os.environ.get('BUCKET', False)
 CKPT_S3_FILE = os.environ.get('CKPT_S3_FILE', False)
 LABEL_S3_FILE = os.environ.get('LABEL_S3_FILE', False)
+BASEWIDTH = int(os.environ.get('BASEWIDTH', 300))
 content_types = {'jpg': 'image/jpeg',
                  'jpeg': 'image/jpeg',
                  'png': 'image/png'}
@@ -270,6 +271,11 @@ def detect_objects(image_path, url):
 def get_image(url):
   file_name = '/tmp/' + url.split('/')[-1].split('?')[0]
   urllib.request.urlretrieve(url, file_name)
+  img = Image.open(file_name)
+  wpercent = (BASEWIDTH/float(img.size[0]))
+  hsize = int((float(img.size[1])*float(wpercent)))
+  img = img.resize((BASEWIDTH,hsize), Image.ANTIALIAS)
+  img.save(file_name) 
   return file_name
 
 @app.route('/')

@@ -3,3 +3,4 @@
 *.pyc
 *.env
 harbor-compose.yml
+local-docker-compose.yml
